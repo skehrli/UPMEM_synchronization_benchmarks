@@ -16,54 +16,58 @@ max_sems=16
 #Clear files
 rm ${filename}
 
-#For each main_section
-for ((ms = 0; ms < num_main_sections; ms++))
+#For each number of dpus
+for((dpus = 1; dpus <= 64; dpus*=2))
 do
-    #For each critical_section
-    for ((cs = 0; cs < num_critical_sections; cs++))
+    #For each main_section
+    for ((ms = 0; ms < num_main_sections; ms++))
     do
-        #New titel in result file
-        titel="tasklets"
-        for ((sems = 1; sems <= ${max_sems}; sems = sems * 2))
+        #For each critical_section
+        for ((cs = 0; cs < num_critical_sections; cs++))
         do
-            titel=$titel";"${sems}"_sc;"${sems}"_snc"
-        done
-
-        echo "main_section ${main_section[ms]} critical_section ${critical_section[cs]}" >> ${filename}
-        echo ${titel} >> ${filename}
-
-        echo "main_section ${main_section[ms]} critical_section ${critical_section[cs]}"
-        echo ${titel}
-
-        #For each number of tasklets
-        for ((tasklets = 1; tasklets <= ${max_tasklets}; tasklets++))
-        do
-            line=${tasklets}
-            for ((sems = 1; sems <= ${tasklets}; sems = sems* 2))
+            #New titel in result file
+            titel="dpus;tasklets"
+            for ((sems = 1; sems <= ${max_sems}; sems*=2))
             do
-                #Run the benchmark
-                command="bench sem_kernel_${sems} ${tasklets} ${numOps} ${critical_section[$cs]} ${main_section[$ms]}"
-                if [ -z ${1+x} ]; 
-                then 
-                    result=$(LD_LIBRARY_PATH=./upmem-2021.3.0-Linux-x86_64/lib ./bin/${command})
-                else 
-                    result=$(./bin/${command})
-                fi
-
-                #Get cycles
-                cycles_str=$(grep 'Maximum Cycles:' <(echo "$result"))
-                read -ra split <<<"$cycles_str"
-
-                cycles=${split[2]}
-                normalized=${split[6]}
-
-                line=${line}";"${cycles}";"${normalized}
+                titel=$titel";"${sems}"_sc;"${sems}"_snc"
             done
 
-            echo ${line} >> ${filename}
-            echo ${line}
+            echo "main_section ${main_section[ms]} critical_section ${critical_section[cs]}" >> ${filename}
+            echo ${titel} >> ${filename}
+
+            echo "main_section ${main_section[ms]} critical_section ${critical_section[cs]}"
+            echo ${titel}
+
+            #For each number of tasklets
+            for ((tasklets = 1; tasklets <= ${max_tasklets}; tasklets*=2))
+            do
+                line=${dpus}";"${tasklets}
+                for ((sems = 1; sems <= ${tasklets}; sems*=2))
+                do
+                    #Run the benchmark
+                    command="bench sem_kernel_${sems} ${tasklets} ${dpus} ${numOps} ${critical_section[$cs]} ${main_section[$ms]}"
+                    if [ -z ${1+x} ]; 
+                    then 
+                        result=$(LD_LIBRARY_PATH=./upmem-2021.3.0-Linux-x86_64/lib ./bin/${command})
+                    else 
+                        result=$(./bin/${command})
+                    fi
+
+                    #Get cycles
+                    cycles_str=$(grep 'Maximum Cycles:' <(echo "$result"))
+                    read -ra split <<<"$cycles_str"
+
+                    cycles=${split[2]}
+                    normalized=${split[6]}
+
+                    line=${line}";"${cycles}";"${normalized}
+                done
+
+                echo ${line} >> ${filename}
+                echo ${line}
+            done
+            echo "" >> ${filename}
+            echo ""
         done
-        echo "" >> ${filename}
-        echo ""
     done
 done
